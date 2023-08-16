@@ -48,7 +48,7 @@ This guide will walk you through the steps to set up and use the code:
    ```terminal
    your_venv_name\Scripts\activate
    ```
-    **macOS and Linux:**
+    **On macOS and Linux:**
    ```terminal
    cd path/to/your/project/directory
     ```
