@@ -1,6 +1,5 @@
 import requests
 from dateutil.parser import parse
-from datetime import datetime
 from pprint import pprint
 
 
@@ -23,7 +22,7 @@ class ClockifyAPI:
             workspaces = response.json()
             if workspaces:
                 try:
-                    return pprint(workspaces)  # print(json.dumps(workspaces, indent=4))
+                    return pprint(workspaces)
                 except Exception as e:
                     return print(f"No workspaces found: {type(e).__name__}")
         else:
@@ -40,7 +39,7 @@ class ClockifyAPI:
             projects = response.json()
             if projects:
                 try:
-                    return pprint(projects)  # print(json.dumps(workspaces, indent=4))
+                    return pprint(projects)
                 except Exception as e:
                     return print(f"No workspaces found: {type(e).__name__}")
         else:
@@ -58,11 +57,23 @@ class ClockifyAPI:
             if response.status_code == 200:
                 tasks = response.json()
                 if tasks:
-                    return [task["name"] for task in tasks]
+                    return tasks
                 else:
                     print("No tasks found")
         except Exception as e:
             print("Error getting tasks list. Status code:", response.status_code)
+
+    def get_task_by_id(self, task_id: str) -> list:
+        response = requests.get(
+            f"https://api.clockify.me/api/v1/workspaces/{self.workspace_id}/projects/{self.project_id}/tasks/{task_id}",
+            headers=self.headers,
+        )
+        if response.status_code == 200:
+            tasks_info = response.json()
+            if tasks_info:
+                return tasks_info["name"]
+        else:
+            [f"Error getting workspace list. Status code: {response.status_code}"]
 
     def get_timer_records(self) -> list:
         try:
@@ -80,27 +91,92 @@ class ClockifyAPI:
         except Exception as e:
             print("Error:", e)
 
+    def prepare_task_date(self, timer_records):
+        task_date_dict = {}
+        for record in timer_records:
+            id = record["taskId"]
+            description = record["description"]
+            interval = record["timeInterval"]
+            dates = parse(interval["start"]).date()
+            if dates in task_date_dict:
+                task_date_dict[dates][id] = description
+            else:
+                task_date_dict[dates] = {id: description}
+        return task_date_dict
+
+    def prepare_task_hours_data(self, timer_records):
+        task_hours_dict = {}
+        total_hours_spent = 0
+        for record in timer_records:
+            id = record["taskId"]
+            interval = record.get("timeInterval")
+            if interval and interval.get("start") and interval.get("end"):
+                try:
+                    start_time = parse(interval["start"])
+                    end_time = parse(interval["end"])
+                    duration_calculate = end_time - start_time
+                    hours_spent = duration_calculate.total_seconds() / 3600
+                    total_hours_spent += hours_spent
+                    if id in task_hours_dict:
+                        task_hours_dict[id] += hours_spent
+                    else:
+                        task_hours_dict[id] = hours_spent
+                except Exception as e:
+                    print(f"Error processing interval for record {record}: {e}")
+            else:
+                print(f"Skipped record with missing or invalid interval: {record}")
+
+        return task_hours_dict, total_hours_spent
+
     def generate_task_report(self):
         try:
             timer_records = self.get_timer_records()
             if timer_records:
-                total_hours_spent = 0
-                for record in timer_records:
-                    task_name = record["description"]
-                    task_id = record["id"]
-                    interval = record["timeInterval"]
-
-                    start_time = parse(interval["start"])
-                    end_time = parse(interval["end"])
-
-                    duration = end_time - start_time
-                    hours_spent = duration.total_seconds() / 3600
-                    total_hours_spent += hours_spent
+                task_hours_dict, total_hours_spent = self.prepare_task_hours_data(
+                    timer_records
+                )
+                task_date_dict = self.prepare_task_date(timer_records)
+                if task_date_dict:
+                    print("{: ^70}".format("📅TASK REPORT FOR TASKS SORTED BY DATE📅"))
+                for date, tasks in task_date_dict.items():
+                    formatted_date = date.strftime("%Y-%m-%d")
+                    frame_line = "=" * (len(formatted_date) + 6)
+                    print(frame_line, f"Date: {formatted_date}", frame_line, sep="\n")
+                    for id, description in tasks.items():
+                        tasks_info = self.get_task_by_id(id)
+                        hours_spent = task_hours_dict.get(id, 0)
+                        print(
+                            "\n".join(
+                                [
+                                    "-" * (len(formatted_date) + 60),
+                                    f"Task Name: {tasks_info}",
+                                    f"Hours Spent: {hours_spent:.2f} hours",
+                                    f"Description: {description}",
+                                    "-" * (len(formatted_date) + 60),
+                                ]
+                            )
+                        )
+                print("{: ^70}".format("⌚TASK REPORT FOR TASKS BY TIME TRACKER⌚"))
+                for id, hours_spent in task_hours_dict.items():
+                    tasks_info = self.get_task_by_id(id)
                     print(
-                        f"Task description in Time Tracker: {task_name}\nTask ID: {task_id}\nHours Spent: {hours_spent:.2f} hours\n"
+                        "\n".join(
+                            [
+                                "-" * (len(formatted_date) + 60),
+                                tasks_info,
+                                f"Total hours spent for this task: {hours_spent:.2f} hours",
+                                "-" * (len(formatted_date) + 60),
+                            ]
+                        )
                     )
                 print(
-                    f"Total hours spent fixed by Timer: {total_hours_spent:.2f} hours"
+                    "\n".join(
+                        [
+                            "{: ^70}".format("🌟TOTAL HOURS SPENT FOR TASKS🌟"),
+                            f"Total hours fixed by Time Tracker: {total_hours_spent:.2f} hours",
+                            "\n",
+                        ]
+                    )
                 )
             else:
                 print("No timer records found")
@@ -115,10 +191,7 @@ if __name__ == "__main__":
     USER_ID = "64dcc03aee1545789668e1d0"
 
     clockify_api = ClockifyAPI(API_KEY, WORKSPACE_ID, PROJECT_ID, USER_ID)
-    tasks = clockify_api.get_all_tasks()
+    # You can uncomment and check how Task6 works:
+    # tasks = clockify_api.get_all_tasks()
     # pprint(tasks)
-
-    timer_records = clockify_api.get_timer_records()
-    # pprint(timer_records)
-
     clockify_api.generate_task_report()
