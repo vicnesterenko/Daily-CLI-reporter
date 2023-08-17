@@ -78,8 +78,11 @@ This guide will walk you through the steps to set up and use the code:
    python Task6.py
    ```
 
-3. **View Task List**:
-   - The script will print the list of tasks from the specified workspace and project.
+3. **View Task Report**:
+   - The script will print results for Task 6 and Task 8 of the test Python project for a job offer.
+   - The `TASK REPORT FOR TASKS SORTED BY DATE` section nicely groups tasks by date.
+   - `TASK REPORT FOR TASKS BY TIME TRACKER` section provides a summary of each task's total hours spent.
+   - The `TOTAL HOURS SPENT FOR TASKS` section gives an overall summary of the time tracked for all tasks in Time Tracker.
 
 ### Notes
 
